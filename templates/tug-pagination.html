@@ -1,0 +1,28 @@
+{%load i18n utils%}
+{%for tug in tugs%}
+{%with perm=tug|grant_permission:user medium=tug.media.all iid=tug.initiator.id initiator=tug.initiator tid=tug.id%}
+<article tid={{tid}}>
+	<output>
+	{%if perm%}<div onclick='tugDelete(this, event)' tid={{tid}}>{%trans 'delete'%}</div>
+	<div><a href="{%url 'profile' iid%}"><img alt={{initiator}} class=small src={%url 'avatar-member' iid%}></a></div>
+	<div><a href={%url 'tug-edit' tid%}>{%trans 'edit'%}</a></div>
+	<div onclick='tugCtxEdit(this, event)' tid={{tid}}>ctxEdit</div>
+	{%else%}
+	<div><a href="{%url 'profile' iid%}"><img alt={{initiator}} class=small src={%url 'avatar-member' iid%}></a></div>
+	{%endif%}
+	</output>
+	<summary>
+	<div><a href={%url 'tug-detail' tid%}>{{tug.title}}</a><time>{{tug.timestamp|timesince}} {%trans 'ago'%}</div>
+	<div>{{tug.description}}</div>
+	<hgroup><div>{%trans 'max'%} {{tug.max}}</div><div>{{tug.coordinate}}</div><div><time datetime={{tug.datetime}}>{{tug.datetime}}</time></div></hgroup>
+	{%if medium%}<div>
+	{%for media in medium%}
+		{%if media|isImage%}<img class=small src={%url 'avatar-raw' media.id%} onclick='showModal(this)'>
+		{%else%}<a href={%url 'avatar-raw' media.id%}>{{media.filename}}</a>
+		{%endif%}
+	{%endfor%}
+	</div>{%endif%}
+	</summary>
+</article>
+{%endwith%}
+{%endfor%}

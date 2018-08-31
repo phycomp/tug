@@ -1,0 +1,160 @@
+{%extends 'base.html'%}
+{%load i18n utils%}
+{%block STYLE%}
+<style>
+input{margin-top:2px; }
+input[type=number], input[type=datetime]{width:100%; }
+hgroup{justify-content:space-between; }
+summary{flex:9; }
+.datetime{margin-right:2px; display:flex; flex:1}
+</style>
+{%endblock STYLE%}
+{%block SCRIPT%}
+<script>
+let idAttr='tid', url="{%url 'tug-pagination'%}"
+window.onscroll=function(){infinitScroll(url, idAttr)}
+
+let section, tugAdd=ById('tugAdd'), article, txtarea
+function tugDelete(obj){
+	tid=obj.getAttribute('tid');
+	data=JSON.stringify({tid:tid});
+	xhr.data_sent("{%url 'tug-delete'%}", data);
+			xhr.onreadystatechange=function(evt)
+			{ if(this.readyState==4 && this.status==200)
+					{ rspData=JSON.parse(this.responseText);
+					if (rspData.TugDeleted) obj.parentNode.parentNode.remove();
+					else console.log('Tug Not Deleted')}
+			}
+}
+
+	tugAdd.addEventListener('submit', evt=>{
+		//txtarea=tugAdd.getElementsByTagName('textarea')[0]
+		article=querySelector('article')
+		if(!document.contains(article)) article=newData;
+		formdata=new FormData(tugAdd); 
+			xhr.data_sent("{%url 'tug-add'%}", formdata);
+			xhr.onreadystatechange=function(evt)
+				{ if(this.readyState==4 && this.status==200)
+						{ rspData=JSON.parse(this.responseText);
+						if (rspData.tugAdded){ article.insertAdjacentHTML('beforebegin', rspData.ctx); tugAdd.reset()}
+						else console.log('Tug Not Added') }
+				}
+		evt.preventDefault(), false})
+</script>
+{%endblock SCRIPT%}
+{%block SECTION%}
+<form id=tugAdd enctype=multipart/form-data method=post validate>
+<input type=text name=title placeholder=title required>
+<input type=text name=coordinate placeholder=coordinate autocomplete=coordinate required>
+<hgroup>
+<input class=datetime type=date name=date placeholder=date required>
+<input class=datetime type=time name=time placeholder=time required>
+<input class=datetime type=number name=max placeholder=max required>
+</hgroup>
+<textarea style='margin-top:2px' name=description placeholder=description required></textarea>
+<input type=file name=attached placeholder=attached multiple>
+<button>{%trans 'tug add'%}</button>
+</form>
+{%endblock SECTION%}
+{%block ARTICLE%}
+{%for tug in tugs%}
+{%with iid=tug.initiator.id userID=user.id initiator=tug.initiator coordinate=tug.coordinate datetime=tug.datetime timestamp=tug.timestamp title=tug.title.title tid=tug.id medium=tug.media.all%}
+<article tid={{tid}}>
+	<output style='margin-right:2px'>
+	{%if iid == userID%}<div onclick='tugDelete(this, event)' tid={{tid}}>{%trans 'delete'%}</div>
+	<div><a href="{%url 'profile' iid%}"><img alt={{initiator}} class=small src={%url 'avatar-member' iid%}></a></div>
+	<div><a href={%url 'tug-edit' tid%}>{%trans 'edit'%}</a></div>
+	<div onclick='tugCtxEdit(this, event)' tid={{tid}}>ctxEdit</div>
+	{%else%}
+	<div><a href="{%url 'profile' iid%}"><img alt={{initiator}} class=small src={%url 'avatar-member' iid%}></a></div>
+	{%endif%}
+	</output>
+	<summary>
+	<div><a href={%url 'tug-detail' tid%}>{{title}}</a><time>{{timestamp|timesince}} {%trans 'ago'%}</div>
+	<div>{{tug.description}}</div>
+	<hgroup><div>{%trans 'max'%} {{tug.max}}</div><div>{{coordinate}}</div><div><time datetime={{datetime}}>{{datetime}}</time></div></hgroup>
+	{%if medium%}<div>
+	{%for media in medium%}
+		{%if media|isImage%}<img class=small src={%url 'avatar-raw' media.id%} onclick='showModal(this)'>
+		{%else%}<a href={%url 'avatar-raw' media.id%}>{{media.filename}}</a>
+		{%endif%}
+	{%endfor%}
+	</div>{%endif%}
+	{#<div tid={{tug.id}} onclick='tugJoin(this, event)'>{%trans 'tug join'%}</div>#}
+	</summary>
+</article>
+{%endwith%}
+{%endfor%}
+{%endblock ARTICLE%}
+{%block ASIDE%}
+{%include 'infinitescroll.html'%}
+{%include 'carousel.html'%}
+{%endblock ASIDE%}
+{%comment%}
+<div class=newData></div>
+<div class=modal>
+<span class=closeModal onclick='closeModal(this)'>&times;</span>
+<span class=slideLeft onclick='slideLeft(this)'>&#10094;</span>
+<div class=modalContainer><img id=MODAL></div>
+<span class=slideRight onclick='slideRight(this)'>&#10095;</span>
+</div>
+<style>
+#tugAdd{width:100%; }
+.modal{display:-webkit-flex; display:flex; flex-flow:row; justify-content:center; align-items:center; position:fixed; left:0; top:0; height:100%; width:100%; display:none; z-index:1; background-color:rgba(0,0,0,.8); }
+.modalContainer{display:flex; border-radius:5px; /*overflow:hidden; justify-content:center; align-items:center;*/ }
+.slideRight{position:fixed; font-size:3vw; right:50px; }
+.slideLeft{position:fixed; font-size:3vw; left:50px; }
+.closeModal{position:fixed; font-size:3vw; left:10px; top:10px; }
+/*img{width:20%; height:20%; }*/
+</style>
+</main>
+var IMG=ById('MODAL'), modal=querySelector('.modal'), modalContainer=querySelector('.modalContainer'), modalClose=querySelector('.closeModal')
+var IMG, Images=[], IMGs={}, imgLength
+document.addEventListener('keyup', function(event){
+	if(event.which==27) modal.style.display='none';
+})
+function showModal(obj, event){
+	Images=[]; IMGs={}
+	images=obj.parentNode.getElementsByTagName('img'), imgLength=images.length;
+	for (let idx=0;idx<imgLength;idx++)
+		{ img=images[idx].getAttribute('src')
+		Images.push(img)
+		IMGs[idx]=img }
+	modal.style.display='flex'
+	innerWidth=modal.innerWidth*.5; innerHeight=modal.innerHeight*.5
+	IMG.src=obj.getAttribute('src')
+	IMG.style.width=innerWidth
+	IMG.style.height=innerHeight
+	//modalContainer.appendChild(IMG)
+}
+function slideRight(obj){
+	imgsrc=IMG.getAttribute('src')
+	idx=Images.indexOf(imgsrc)
+	if (idx==imgLength-1) return;
+	IMG.src=IMGs[idx+1]
+}
+function slideLeft(obj){
+	imgsrc=IMG.getAttribute('src')
+	idx=Images.indexOf(imgsrc)
+	if (!idx) return;
+	IMG.src=IMGs[idx-1]
+}
+function closeModal(obj){ obj.parentNode.style.display='none' }
+let data, newdataOffsetTop, scrollPos, winHeight=window.innerHeight, paginationStatus=true;
+function infinitScroll(){
+	newdataOffsetTop=newData.offsetTop, scrollPos=window.pageYOffset, winnerHeight=window.innerHeight;
+	let tid=newData.previousElementSibling.getAttribute('tid')
+	if (scrollPos+winnerHeight>newdataOffsetTop&&paginationStatus)
+		{data=JSON.stringify({'tid':tid})
+		xhr.data_sent("{%url 'tug-pagination'%}", data);
+		paginationStatus=!paginationStatus
+		xhr.onreadystatechange=function(evt)
+			{ if(this.readyState===4 && this.status===200)
+				{ rspData=JSON.parse(this.response);
+				if (rspData.newData) { paginationStatus=true; newData.insertAdjacentHTML('beforebegin', rspData.newData);}
+				else console.log('newData not inserted')}
+			}
+		}
+}
+newData=querySelector('.newData'), 
+{%endcomment%}

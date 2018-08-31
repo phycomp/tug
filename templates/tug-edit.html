@@ -1,0 +1,58 @@
+{%extends 'base.html'%}
+{%load i18n%}
+{%block SCRIPT%}
+<script>
+function tugMediaDelete(obj){
+	data=JSON.stringify({mid:obj.getAttribute('mid')});
+	xhr.data_sent("{%url 'tug-media-delete'%}", data);
+	xhr.onreadystatechange=function(evt){
+		if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+			if (rspData.TugMediaDeleted) obj.remove();
+			else console.log('Media Not Deleted'); };
+		};
+}
+</script>
+{%endblock SCRIPT%}
+{%block STYLE%}
+<style>
+main{justify-content:center; }
+textarea{width:100%; border-radius:5px; margin-top:2px; }
+/*
+.ck-editor { color:green; }
+.wrapper{display:flex; margin:20px auto}
+input[type=text]{width:100%; margin-bottom:20px}
+textarea{width:100%; }
+button{display:block; margin-top:20px; margin:0 auto}
+*/
+</style>
+{%endblock STYLE%}
+{%block MAIN%}
+<main>
+{%if perms.tug.can_edit%}
+<form action={%url "tug-edit" tug.id%} method=POST>
+<input type=hidden value={{csrf_token}} name=csrfmiddlewaretoken>
+<input type=text name=title placeholder='title' value="{{tug.title}}" required>
+<input type=text name=coordinate placeholder='coordinate' value="{{tug.coordinate}}" required>
+<textarea name=description placeholder=description cols=30 rows=8 required>{{tug.description}}</textarea>
+<datalists>
+<input type=file name=attached placeholder="{%trans 'attached files'%}" multiple>
+	{%with medium=tug.media.all%}
+	{%for media in medium%}
+	<div onclick='tugMediaDelete(this, event)' mid={{media.id}}><img style='width:40px;height:40px' src={%url 'avatar-raw' media.id%}>{%trans 'delete'%}</div>
+	{%endfor%}
+	{%endwith%}
+</datalists>
+<button>{%trans 'Tug Edit'%}</button>
+</form>
+{%else%}
+<h1 style='color:red'>No permission granted!</h1>
+{%endif%}
+</main>
+{%endblock MAIN%}
+{%comment%}
+<script src="https://cdn.ckeditor.com/ckeditor5/10.0.1/classic/ckeditor.js"></script>
+<script>
+ClassicEditor.create(document.querySelector('#editor') ).catch( error => {
+            console.error( error );
+        } );
+{%endcomment%}

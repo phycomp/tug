@@ -1,0 +1,380 @@
+{%extends 'base.html'%}
+{%load i18n utils%}
+{%block CSS%}
+<link rel=stylesheet href='{{MEDIA_URL}}css/leaflet.css' integrity='' crossorigin=''>
+<script src={{MEDIA_URL}}js/leaflet.js integrity='' crossorigin=''></script>
+<script src={{MEDIA_URL}}js/bundle.min.js></script>
+<script src='{{MEDIA_URL}}js/Control.FullScreen.js'></script>
+{%endblock CSS%}
+{%block SCRIPT%}
+<script>
+window.onload=function(){ONLOAD()}
+let rspData, tugEdit=document.getElementById('tugEdit'), formdata
+
+function ONLOAD(){
+}
+
+tugEdit.addEventListener('submit', function(event){
+	//article=querySelector('article')
+	//attached=this.querySelector('input[name=attached]')
+	formdata=new FormData(this)
+	xhr.data_sent("{%url 'tug-edit'%}", formdata)
+	xhr.onreadystatechange=function(evt)
+	{ if(this.readyState==4&&this.status==200)
+		{rspData=JSON.parse(this.responseText)
+		if(rspData.tugUpdated){window.location="{%url 'tug-detail' tid%}"}
+		else console.log('Tug Not Updated') }
+	}
+	event.preventDefault()}, false)
+
+function tugMediaDelete(obj)
+	{ data=JSON.stringify({mid:obj.getAttribute('mid')})
+	xhr.data_sent("{%url 'tug-media-delete'%}", data)
+	xhr.onreadystatechange=function(evt)
+		{ if(this.readyState==4&&this.status==200)
+			{ rspData=JSON.parse(this.responseText)
+				if(rspData.TugMediaDeleted)obj.parentNode.remove()
+				else console.log('Media Not Deleted')}
+		}
+	}
+
+function tugJoin(obj, event)
+	{ data=JSON.stringify({tid:obj.getAttribute('tid')})
+	xhr.data_sent("{%url 'tug-join'%}", data)
+	xhr.onreadystatechange=function(evt)
+		{ if(this.readyState==4&&this.status==200)
+			{ rspData=JSON.parse(this.responseText)
+			if(rspData.tugJoined){console.log('tug Joined')}
+			else console.log('tug Not Joined')}
+		}
+	}
+</script>
+{%endblock SCRIPT%}
+{%block STYLE%}
+<style>
+section{flex:1; flex-flow:row; }
+section output{flex-flow:column }
+article div{margin:2px; }
+article:nth-child(odd){color:#00ffff}
+output div{margin-down:2px; }
+textarea{margin-top:2px; }
+hgroup{justify-content:space-between; }
+summary{flex:9; }
+</style>
+{%endblock STYLE%}
+{%block SECTION%}
+{%if perm%}
+<details>
+<form id=tugEdit enctype='multiple/form-data' method=POST>
+<input type=text name=title placeholder=title value={{title}} required>
+<input type=text name=coordinate placeholder=coordinate value={{coordinate}} required>
+<input type=hidden name=tid value={{tid}} required>
+<datalists>
+<input type=number name=max placeholder=coordinate value={{max}} required>
+<input type=date name=date placeholder=date value='{{date|date:"Y-m-d"}}' required>
+<input type=time name=time placeholder=time value='{{time}}' required>
+</datalists>
+<textarea name=description placeholder=description cols=30 rows=8 required>{{tug.description}}</textarea>
+<picture>
+<input type=file name=attached placeholder="{%trans 'attached files'%}" multiple>
+	{%for media in medium%}<output>
+	<img class=small src={%url 'avatar-raw' media.id%}><div onclick='tugMediaDelete(this, event)' mid={{media.id}}>{%trans 'delete'%}</div>
+	</output>{%endfor%}
+</picture>
+<button>{%trans 'Tug Edit'%}</button>
+</form>
+</details>
+{%endif%}
+
+<section>
+	<output style='margin-right:2px'>
+		{#<div onclick='tugDelete(this)' tid={{tid}}>delete</div>#}
+		{#<div onclick='tugCtxEdit(this)' tid={{tid}}>{%trans 'ctxEdit'%}</div>#}
+		<a href={%url 'profile' iid%}><img class=small src={%url 'avatar-member' iid%}></a>
+		<div tid={{tid}} onclick='tugJoin(this, event)'>{%trans 'tugJoin'%}</div>
+	</output>
+	<summary>
+		<div>{{title}}<time>{{timestamp|timesince}} ago</time></div>
+		<div>{%autoescape off%}{{description}}{%endautoescape%}</div>
+		<hgroup>
+		<div>{%trans 'max'%} {{max}}</div><div>{%trans 'coordinate'%} {{coordinate}}</div><div><time>{%trans 'datetime'%} {{datetime}}</time></div>
+		</hgroup>
+		{%if tuggers%}<hgroup>{%trans 'tuggers'%}
+			{%for tugger in tuggers%}
+			<div><a href={%url 'profile' tugger.id%}><img src={%url 'avatar-member' tugger.id%} class=small></a></div>
+			{%endfor%}
+		</hgroup>{%endif%}
+		{%if medium%}<picture>
+			{%for media in medium%}
+				{%if media|isImage%}<img class=small src={%url 'avatar-raw' media.id%} onclick='showModal(this)'>
+				{%else%}<a href={%url 'avatar-raw' media.id%}>{{media.filename}}</a>{%endif%}
+			{%endfor%}
+		</picture>{%endif%}
+	</summary>
+</section>
+<textarea rows=1 tid={{tid}} onkeyup='commentTug(this, event)'></textarea>
+{%endblock SECTION%}
+{%block ASIDE%}
+{%include 'carousel.html'%}
+{%endblock ASIDE%}
+{%comment%}
+#app {width:90%; height:400px; margin:auto; }
+.leaflet-container{margin-top:4px; }
+<main>
+</main>
+var xhr=new XMLHttpRequest()
+xhr.data_sent=function(url, data){
+	this.open('POST', url, false);
+	this.setRequestHeader('X-CSRFToken', '{{csrf_token}}');
+	this.send(data);
+	};
+import { OpenStreetMapProvider } from 'leaflet-geosearch';
+const provider = new OpenStreetMapProvider()
+	function addr2latLng(){
+	var latlng, data=JSON.stringify({coordinate:'{{tug.coordinate}}'})
+	xhr.data_sent("{%url 'addr2lat-lng'%}", data);
+	xhr.onreadystatechange=evt=>
+		{ if(this.readyState==4 && this.status==200)
+				{ rspData=JSON.parse(this.responseText); console.log(rspData);
+				if (rspData.addr2LatLng) {latlng=[rspData.Lat, rspData.Lng]; console.log(latlng); return latlng;}
+				else console.log('Tug Not Deleted')}
+		}
+	if (latlng) console.log(latlng); return latlng;
+}
+	var latlng=addr2latLng();
+	//latlng=[25.0821886,121.49152349999997]
+	//setInterval(1000);
+	setTimeout(900000);
+	console.log(latlng);
+	var taoMap=L.map('taoMap', {position:'topleft', title:'Show me the fullscreen !', titleCancel:'Exit fullscreen mode', content:null, forceSeparateButton:true, forcePseudoFullscreen:true, fullscreenElement:false}).setView(latlng, 13);
+	//var taoMap=L.map('map', {zoom:12, center:new L.latLng(41.8990, 12.4977), layers:L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png') });
+	L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', { maxZoom: 18,
+		attribution: "Map data &copy; <a href='https://www.openstreetmap.org/'>OpenStreetMap</a> contributors, " +
+			"<a href='https://creativecommons.org/licenses/by-sa/2.0/'>CC-BY-SA</a>, " +
+			"Imagery © <a href='https://www.mapbox.com/'>Mapbox</a>",
+		id:'mapbox.streets'
+	}).addTo(taoMap);
+
+	L.marker(latlng).addTo(taoMap).bindPopup('<b>Hello world!</b><br>HOME.').openPopup();
+	L.circle(latlng, 500, {color:'red', fillColor:'#f03', fillOpacity:.5}).addTo(taoMap).bindPopup('I am a circle.');
+	var polygon=L.polygon([
+		[25.037, 121.53], [25.010099, 121.535244], [25.038719, 121.574191]
+	]).addTo(taoMap).bindPopup('I am a polygon.');
+	polygon.bindTooltip('taoPolygon', {permanent:true, direction:'center'}).openTooltip();
+
+	var popup = L.popup();
+	function onMapClick(e){popup.setLatLng(e.latlng).setContent('You clicked the map at '+e.latlng.toString()).openOn(taoMap) }
+	taoMap.on('click', onMapClick);
+	//var map=new L.Map('map', {fullscreenControl:true, fullscreenControlOptions:{position:'topleft'} });
+	L.control.fullscreen().addTo(taoMap);
+<iframe height=540 src={%url 'leaflet'%}> </iframe>
+/*obj.insertAdjacentHTML('beforebegin', rspData.ctx) obj.value='' */
+{%for comment in comments reversed%}
+<article>
+<summary style='align-items:center; margin-right:2px'>
+	<div onclick='commentTugDelete(this)' cid={{comment.id}}>delete</div>
+	<a href={%url 'profile' comment.commentor.id%}><img src={%url 'avatar-member' comment.commentor.id%} style='with:40px;height:40px'></a>
+	<div onclick='commentTugEdit(this, event)' cid={{comment.id}}>edit</div>
+</summary>
+<summary>
+	<div>{{comment.body}}</div>
+	<div><time>{{comment.timestamp|timesince}} ago</time></div>
+	{%for comment_tug in comment|commenttugself%}
+	<datalists>
+		<output style='align-items:center; margin-right:2px'>
+		<div onclick='commentTugSelfDelete(this)' cid={{comment_tug.id}}>delete</div>
+		<a href={%url 'profile' comment_tug.commentor.id%}><img src={%url 'avatar-member' comment_tug.commentor.id%} style='with:40px;height:40px'></a>
+		<div onclick='commentTugSelfEdit(this, event)' cid={{comment_tug.id}}>edit</div>
+		</output>
+		<output style='flex:9'>
+			<div>{{comment_tug.body}}</div>
+			<div><time>{{comment_tug.timestamp|timesince}} ago</time></div>
+		</output>
+	</datalists>
+	{%endfor%}
+	<textarea rows=1 cid={{comment.id}} onkeyup='commentTugSelf(this, event)'></textarea>
+</summary>
+</article>
+{%endfor%}
+{%endcomment%}
+<div class=modal>
+<span class=closeModal onclick='closeModal(this)'>&times;</span>
+<span class=slideLeft onclick='slideLeft(this)'>&#10094;</span>
+<div class=modalContainer><img id=MODAL></div>
+<span class=slideRight onclick='slideRight(this)'>&#10095;</span>
+</div>
+<style>
+.modal{display:-webkit-flex; display:flex; flex-flow:row; justify-content:center; align-items:center; position:fixed; left:0; top:0; height:100%; width:100%; display:none; z-index:1; background-color:rgba(0,0,0,.8); }
+.modalContainer{display:flex; /*justify-content:center; align-items:center;*/ }
+.slideRight{position:fixed; font-size:3vw; right:50px; }
+.slideLeft{position:fixed; font-size:3vw; left:50px; }
+.closeModal{position:fixed; font-size:3vw; left:10px; top:10px; }
+/*img{width:20%; height:20%; }*/
+</style>
+<script>
+var IMG=ById('MODAL'), modal=querySelector('.modal'), modalContainer=querySelector('.modalContainer'), modalClose=querySelector('.closeModal')
+var IMG, Images=[], IMGs={}, imgLength
+document.addEventListener('keyup', function(event){
+	if(event.which==27) modal.style.display='none';
+})
+function showModal(obj, event){
+	Images=[]; IMGs={}
+	images=obj.parentNode.getElementsByTagName('img'), imgLength=images.length;
+	for (let idx=0;idx<imgLength;idx++)
+		{ img=images[idx].getAttribute('src')
+		Images.push(img)
+		IMGs[idx]=img }
+	modal.style.display='flex'
+	offsetWidth=modal.offsetWidth*.5; offsetHeight=modal.offsetHeight*.5
+	IMG.src=obj.getAttribute('src')
+	IMG.style.width=offsetWidth
+	IMG.style.height=offsetHeight
+	//modalContainer.appendChild(IMG)
+}
+function slideRight(obj){
+	imgsrc=IMG.getAttribute('src')
+	idx=Images.indexOf(imgsrc)
+	if (idx==imgLength-1) return;
+	IMG.src=IMGs[idx+1]
+}
+function slideLeft(obj){
+	imgsrc=IMG.getAttribute('src')
+	idx=Images.indexOf(imgsrc)
+	if (!idx) return;
+	IMG.src=IMGs[idx-1]
+}
+function closeModal(obj){ obj.parentNode.style.display='none' }
+</script>
+{%comment%}
+/*function mouseCloseModal(obj){ obj.style.display='none' }
+modal.addEventListener('mousedown', function(event){
+	this.style.display='none';
+})*/
+//handleOnLoad = function(){L.Icon.Default.imagePath='https://unpkg.com/leaflet@0.7.7/dist/images/' }
+/*import L from 'leaflet';
+import {GeoSearchControl, OpenStreetMapProvider,} from 'leaflet-geosearch'; 
+const provider = new OpenStreetMapProvider();
+const searchControl = new GeoSearchControl({ provider: provider, });
+const map = new L.Map('map');
+map.addControl(searchControl);*/
+{%endcomment%}
+{%comment%}
+function commentTugSelfDelete(obj){
+data=JSON.stringify({cid:obj.getAttribute('cid')})
+xhr.data_sent("{%url 'tug-comment-self-delete'%}", data);
+		xhr.onreadystatechange=function(evt){
+			if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+				if (rspData.commentTugSelfDelete) { obj.parentNode.parentNode.remove();}
+				else console.log('CommentTugSelf Not Deleted') }
+			}
+}
+
+function commentTugSelfEdit(obj){
+	let output=obj.parentNode, datalists=output.parentNode, DIV=output.nextElementSibling.getElementsByTagName('div')[0]
+	let cid=obj.getAttribute('cid'), article=obj.parentNode.parentNode
+	txtarea=ById('cBSE')
+	if(!document.contains(txtarea)) txtarea=document.createElement('textarea')
+	txtarea.rows=1; txtarea.id='cBSE'; txtarea.value=DIV.innerHTML; article.insertAdjacentElement('beforebegin', txtarea)
+	txtarea.addEventListener('keydown', function cBSE(event){
+		data=JSON.stringify({cid:cid, body:this.value})
+		if (event.keyCode===13&&event.altKey&&this.value){
+			xhr.data_sent("{%url 'tug-comment-self-edit'%}", data);
+			xhr.onreadystatechange=function(evt){
+				if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+					if (rspData.commentTugSelfEdit) { DIV.innerHTML=txtarea.value; txtarea.value=''
+					txtarea.removeEventListener('keydown', cBSE)
+					datalists.parentNode.removeChild(txtarea)
+					}
+					else console.log('CommentSutra Not Deleted') }
+				}
+			}
+	}, )
+}
+
+/*function tugDelete(obj){
+	var data=JSON.stringify({tid:obj.getAttribute('tid')});
+	console.log(data);
+	xhr.data_sent("{%url 'tug-delete'%}", data);
+	xhr.onreadystatechange=function(evt){
+		if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+			if (rspData.TugDeleted) obj.parentNode.parentNode.parentNode.innerHTML="<div style='color:red'>Tug removed!</div>";//form.innerHTML="<div style='color:red'>Messages for password reset sent, please check your mailbox.</div>";//console.log('User Existed');
+			else console.log('Tug Not Deleted'); };
+		};
+}*/
+
+function tugCtxEdit(obj){
+	let summary=obj.parentNode.nextElementSibling, DIV=summary.getElementsByTagName('div')[1]//.getElementsByTagName('div')[0]
+	let tid=obj.getAttribute('tid'), txtarea=ById('bE'), section=summary.parentNode
+	if(!document.contains(txtarea)) txtarea=document.createElement('textarea')
+	txtarea.rows=1; txtarea.id='bE'; txtarea.value=DIV.innerHTML; section.insertAdjacentElement('beforebegin', txtarea)
+	txtarea.addEventListener('keydown', function bE(evt){
+		if (evt.keyCode===13&&evt.altKey&&this.value){
+			let body=this.value
+			data=JSON.stringify({tid:tid, body:body})
+			xhr.data_sent("{%url 'tug-context-edit'%}", data);
+			xhr.onreadystatechange=function(evt){
+				if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+					if (rspData.tugCtxEdited) { DIV.innerHTML=body; txtarea.value='';
+					txtarea.removeEventListener('keydown', bE)
+					section.parentNode.removeChild(txtarea)
+					}
+					else console.log('CommentTug Not Deleted') }
+				}
+			}
+	})
+}
+function commentTugEdit(obj, evt){
+	let output=obj.parentNode.nextElementSibling, DIV=output.getElementsByTagName('div')[0], main=querySelector('main')
+	let cid=obj.getAttribute('cid'), article=obj.parentNode.parentNode;
+	txtarea=ById('cBE')
+	if(!document.contains(txtarea)) txtarea=document.createElement('textarea')
+	txtarea.rows=1; txtarea.id='cBE'; txtarea.value=DIV.innerHTML; article.insertAdjacentElement('beforebegin', txtarea)
+	txtarea.addEventListener('keydown', function cBE(event){
+		data=JSON.stringify({cid:obj.getAttribute('cid'), body:this.value})
+		if (event.keyCode===13&&event.altKey&&this.value){
+			xhr.data_sent("{%url 'tug-comment-edit'%}", data);
+			xhr.onreadystatechange=function(event){
+				if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+					if (rspData.commentTugEdit) { DIV.innerHTML=txtarea.value; txtarea.value=''
+					txtarea.removeEventListener('keydown', cBE); main.removeChild(txtarea) }
+					}
+					else console.log('CommentTug Not Edited') }
+				}
+	})
+}
+
+function commentTugDelete(obj){
+data=JSON.stringify({cid:obj.getAttribute('cid')})
+xhr.data_sent("{%url 'tug-comment-delete'%}", data);
+		xhr.onreadystatechange=function(evt){
+			if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+				if (rspData.commentTugDelete) { obj.parentNode.parentNode.remove()}
+				else console.log('CommentTug Not Deleted') }
+			}
+}
+function commentTug(obj, evt){
+	if (evt.keyCode==13&&evt.altKey)
+	{ data=JSON.stringify({tid:obj.getAttribute('tid'), body:obj.value});
+		xhr.data_sent("{%url 'tug-comment'%}", data)
+		xhr.onreadystatechange=function(evt){
+			if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+				if (rspData.commentTugPosted) {
+					obj.insertAdjacentHTML('afterend', rspData.ctx)
+					obj.value='' } 
+				else console.log('comment Not Posted') }
+			}
+	}
+}
+function commentTugSelf(obj, evt){
+	data=JSON.stringify({cid:obj.getAttribute('cid'), body:obj.value})
+	if (evt.keyCode===13&&evt.altKey){xhr.data_sent("{%url 'tug-comment-self'%}", data)
+		xhr.onreadystatechange=function(evt){
+			if(this.readyState==4 && this.status==200) { rspData=JSON.parse(this.responseText);
+				if (rspData.commentTugSelf) { obj.insertAdjacentHTML('beforebegin', rspData.ctx)
+					obj.value='' }
+				else console.log('CommentTugSelf Not Posted') }
+			
+		}
+	}
+}
+{%endcomment%}
